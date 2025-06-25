@@ -5,14 +5,19 @@ async function fetchWeatherData(cityName) {
     cityName
   )}?unitGroup=metric&key=${API_KEY}&contentType=json`;
 
-  try {
-    const response = await fetch(url);
-    const data = await response.json();
-    console.log("Raw API Data:", data);
-    return data;
-  } catch (error) {
-    console.error("Error fetching weather:", error);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! Status: ${response.status}`);
   }
+
+  const data = await response.json();
+
+  if (!data.currentConditions) {
+    throw new Error("No weather data found for this location.");
+  }
+
+  return data;
 }
 
 function cleanInput(input) {
@@ -27,10 +32,6 @@ function capitalizeWords(str) {
     .join(" ");
 }
 
-// function that takes the raw data and returns a simplified object
-// with only the necessary information for display
-// location, temp, description, icon
-// Example: { location: "New York", temp: 22, description: "Sunny", icon: "sunny" }
 function processWeatherData(data) {
   return {
     cityName: data.resolvedAddress,
@@ -40,50 +41,9 @@ function processWeatherData(data) {
   };
 }
 
-document
-  .getElementById("weather-form")
-  .addEventListener("submit", async (e) => {
-    e.preventDefault();
-
-    // Get the input value
-    let cityName = document.getElementById("cityName-input").value;
-
-    // Clean it, and capitalize it
-
-    cityName = cleanInput(cityName);
-    // If the input is empty, alert the user
-    if (!cityName) {
-      alert("Please enter a valid city name");
-
-      // and return early
-      return;
-    }
-
-    // Capitalize the first letter of each word
-    // e.g. "new york" -> "New York"
-    cityName = capitalizeWords(cityName);
-
-    // Fetch the weather data
-    console.log("Fetching weather for:", cityName);
-
-    // Call the fetchWeatherData function with the cleaned location
-    const rawData = await fetchWeatherData(cityName);
-
-    // If the data is not found or there is an error, alert the user
-    if (!rawData || rawData.error) {
-      alert("City not found, please try again.");
-      return;
-    }
-
-    // Process the raw data
-    const processed = processWeatherData(rawData);
-    displayWeather(processed);
-  });
-
 function displayWeather(data) {
   const container = document.getElementById("weather-output");
-  container.style.display = "block"; // show when there's data
-
+  container.classList.remove("hidden");
   container.innerHTML = `
     <h2>${data.cityName}</h2>
     <p>${data.description}</p>
@@ -95,3 +55,34 @@ function displayWeather(data) {
     />
   `;
 }
+
+function showLoader(show) {
+  document.getElementById("loader").classList.toggle("hidden", !show);
+}
+
+document
+  .getElementById("weather-form")
+  .addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const inputField = document.getElementById("cityName-input");
+    let cityName = cleanInput(inputField.value);
+
+    if (!cityName) {
+      alert("Please enter a valid city name");
+      return;
+    }
+
+    cityName = capitalizeWords(cityName);
+    showLoader(true);
+    document.getElementById("weather-output").classList.add("hidden");
+
+    try {
+      const rawData = await fetchWeatherData(cityName);
+      const processed = processWeatherData(rawData);
+      displayWeather(processed);
+    } catch (error) {
+      alert(`❌ Error: ${error.message}`);
+    } finally {
+      showLoader(false);
+    }
+  });
